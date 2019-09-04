@@ -216,7 +216,7 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
 				tw /= C.classifier_regr_std[2]
 				th /= C.classifier_regr_std[3]
 				x, y, w, h = roi_helpers.apply_regr(x, y, w, h, tx, ty, tw, th)
-				print("x, y, w, h:", x,y,w,h)
+				#print("x, y, w, h:", x,y,w,h)
 			except:
 				pass
 			bboxes[cls_name].append([C.rpn_stride*x, C.rpn_stride*y, C.rpn_stride*(x+w), C.rpn_stride*(y+h)])
