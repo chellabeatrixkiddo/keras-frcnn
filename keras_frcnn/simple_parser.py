@@ -14,7 +14,7 @@ def get_data(input_path):
 	with open(input_path,'r') as f:
 
 		print('Parsing annotation files')
-
+		chkval = 0
 		for line in f:
 			line_split = line.strip().split(',')
 			(filename,x1,y1,x2,y2,class_name) = line_split
@@ -39,10 +39,15 @@ def get_data(input_path):
 				all_imgs[filename]['width'] = cols
 				all_imgs[filename]['height'] = rows
 				all_imgs[filename]['bboxes'] = []
-				if np.random.randint(0,6) > 0:
+				if chkval < 1024:
 					all_imgs[filename]['imageset'] = 'trainval'
 				else:
 					all_imgs[filename]['imageset'] = 'test'
+				chkval = chkval + 1
+				#if np.random.randint(0,6) > 0:
+				#	all_imgs[filename]['imageset'] = 'trainval'
+				#else:
+				#	all_imgs[filename]['imageset'] = 'test'
 
 			all_imgs[filename]['bboxes'].append({'class': class_name, 'x1': int(x1), 'x2': int(x2), 'y1': int(y1), 'y2': int(y2)})
 

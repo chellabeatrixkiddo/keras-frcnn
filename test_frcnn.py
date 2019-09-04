@@ -11,6 +11,7 @@ from keras import backend as K
 from keras.layers import Input
 from keras.models import Model
 from keras_frcnn import roi_helpers
+import pandas as pd
 
 sys.setrecursionlimit(40000)
 
@@ -29,6 +30,8 @@ parser.add_option("--network", dest="network", help="Base network to use. Suppor
 if not options.test_path:   # if filename is not given
 	parser.error('Error: path to test data must be specified. Pass --path to command line')
 
+
+result_df = pd.DataFrame(columns=['image_name', 'x1', 'y1', 'x2', 'y2'])
 
 config_output_filename = options.config_filename
 
@@ -106,7 +109,7 @@ if C.network == 'resnet50':
 elif C.network == 'vgg':
 	num_features = 512
 
-if K.image_dim_ordering() == 'th':
+if K.image_data_format() == 'channels_first':
 	input_shape_img = (3, None, None)
 	input_shape_features = (num_features, None, None)
 else:
@@ -146,7 +149,7 @@ classes = {}
 bbox_threshold = 0.8
 
 visualise = True
-
+img_id = 1
 for idx, img_name in enumerate(sorted(os.listdir(img_path))):
 	if not img_name.lower().endswith(('.bmp', '.jpeg', '.jpg', '.png', '.tif', '.tiff')):
 		continue
@@ -158,14 +161,14 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
 
 	X, ratio = format_img(img, C)
 
-	if K.image_dim_ordering() == 'tf':
+	if K.image_data_format() == 'channels_last':
 		X = np.transpose(X, (0, 2, 3, 1))
 
 	# get the feature maps and output from the RPN
 	[Y1, Y2, F] = model_rpn.predict(X)
 	
 
-	R = roi_helpers.rpn_to_roi(Y1, Y2, C, K.image_dim_ordering(), overlap_thresh=0.7)
+	R = roi_helpers.rpn_to_roi(Y1, Y2, C, K.image_data_format(), overlap_thresh=0.7)
 
 	# convert from (x1,y1,x2,y2) to (x,y,w,h)
 	R[:, 2] -= R[:, 0]
@@ -194,6 +197,7 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
 		for ii in range(P_cls.shape[1]):
 
 			if np.max(P_cls[0, ii, :]) < bbox_threshold or np.argmax(P_cls[0, ii, :]) == (P_cls.shape[2] - 1):
+				#print("inside if ")
 				continue
 
 			cls_name = class_mapping[np.argmax(P_cls[0, ii, :])]
@@ -212,6 +216,7 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
 				tw /= C.classifier_regr_std[2]
 				th /= C.classifier_regr_std[3]
 				x, y, w, h = roi_helpers.apply_regr(x, y, w, h, tx, ty, tw, th)
+				print("x, y, w, h:", x,y,w,h)
 			except:
 				pass
 			bboxes[cls_name].append([C.rpn_stride*x, C.rpn_stride*y, C.rpn_stride*(x+w), C.rpn_stride*(y+h)])
@@ -221,13 +226,18 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
 
 	for key in bboxes:
 		bbox = np.array(bboxes[key])
-
+		
 		new_boxes, new_probs = roi_helpers.non_max_suppression_fast(bbox, np.array(probs[key]), overlap_thresh=0.5)
 		for jk in range(new_boxes.shape[0]):
 			(x1, y1, x2, y2) = new_boxes[jk,:]
 
 			(real_x1, real_y1, real_x2, real_y2) = get_real_coordinates(ratio, x1, y1, x2, y2)
-
+			
+			d = {"image_name":img_name, "x1":real_x1, "y1":real_y1, "x2":real_x2, "y2":real_y2}
+			result_df = result_df.append(pd.Series(d), ignore_index=True)
+			
+			#print("image_name:", img_name, "x1:", real_x1, "y1:", real_y1, "x2:", real_x2, "y2:", real_y2)
+			
 			cv2.rectangle(img,(real_x1, real_y1), (real_x2, real_y2), (int(class_to_color[key][0]), int(class_to_color[key][1]), int(class_to_color[key][2])),2)
 
 			textLabel = '{}: {}'.format(key,int(100*new_probs[jk]))
@@ -242,6 +252,11 @@ for idx, img_name in enumerate(sorted(os.listdir(img_path))):
 
 	print('Elapsed time = {}'.format(time.time() - st))
 	print(all_dets)
-	cv2.imshow('img', img)
-	cv2.waitKey(0)
-	# cv2.imwrite('./results_imgs/{}.png'.format(idx),img)
+	#cv2.imshow('img', img)
+	#cv2.waitKey(0)
+	cv2.imwrite('./results_imgs/{}.png'.format(idx),img)
+	if(img_id >= 10):
+		break
+	img_id = img_id + 1
+
+result_df.to_csv("./result_annos.csv", index=False)

@@ -290,7 +290,8 @@ def get_anchor_gt(all_img_data, class_count, C, img_length_calc_function, backen
 				# read in image, and optionally add augmentation
 
 				if mode == 'train':
-					img_data_aug, x_img = data_augment.augment(img_data, C, augment=True)
+					img_data_aug, x_img = data_augment.augment(img_data, C, augment=False)
+					#print("Width:", x_img.shape[1], "Height:", x_img.shape[0])
 				else:
 					img_data_aug, x_img = data_augment.augment(img_data, C, augment=False)
 
@@ -325,7 +326,7 @@ def get_anchor_gt(all_img_data, class_count, C, img_length_calc_function, backen
 
 				y_rpn_regr[:, y_rpn_regr.shape[1]//2:, :, :] *= C.std_scaling
 
-				if backend == 'tf':
+				if backend == 'channels_last':
 					x_img = np.transpose(x_img, (0, 2, 3, 1))
 					y_rpn_cls = np.transpose(y_rpn_cls, (0, 2, 3, 1))
 					y_rpn_regr = np.transpose(y_rpn_regr, (0, 2, 3, 1))
